@@ -1,0 +1,50 @@
+name: Laravel CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # 1. Setup PHP 8.3 (Khớp với Dockerfile của bạn)
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, fileinfo, intl
+
+    # 2. Copy file môi trường
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+
+    # 3. Cài đặt thư viện (Thêm --ignore-platform-reqs để tránh lỗi version nhỏ nhặt)
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --ignore-platform-reqs
+
+    # 4. Tạo key
+    - name: Generate key
+      run: php artisan key:generate
+
+    # 5. Tạo Database SQLite ảo để test
+    - name: Create Database
+      run: |
+        mkdir -p database
+        touch database/database.sqlite
+
+    # 6. Cấp quyền (Để tránh lỗi permission denied khi ghi log)
+    - name: Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+
+    # 7. Chạy Test
+    - name: Execute tests
+      env:
+        DB_CONNECTION: sqlite
+        DB_DATABASE: database/database.sqlite
+      run: php artisan test
